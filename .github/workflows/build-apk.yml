@@ -1,5 +1,5 @@
 name: Build F1 test APK
-run-name: F1 arm64 - media session reactivation
+run-name: F1 arm64 - projection coexistence and media session fix
 
 on:
   push:
@@ -45,6 +45,13 @@ jobs:
           "$tools_dir/aapt" dump badging dist/F1-arm64.apk > dist/apk-badging.txt
           grep -F "name='me.aap.fermata.auto.f1'" dist/apk-badging.txt
           grep -F "application-label:'F1'" dist/apk-badging.txt
+          "$tools_dir/aapt" dump xmltree dist/F1-arm64.apk AndroidManifest.xml > dist/apk-manifest.txt
+          grep -F 'me.aap.fermata.auto.f1.F1CarService' dist/apk-manifest.txt
+          grep -F 'me.aap.fermata.auto.f1.F1MirrorService' dist/apk-manifest.txt
+          if grep -Eq 'android:name.*"me[.]aap[.]fermata[.]auto[.](CarService|MirrorService)"' dist/apk-manifest.txt; then
+            echo "Unexpected original projection service registration"
+            exit 1
+          fi
           "$tools_dir/apksigner" verify --verbose --print-certs dist/F1-arm64.apk > dist/apk-signature.txt
           git rev-parse HEAD > dist/source-commit.txt
           sha256sum dist/F1-arm64.apk > dist/SHA256SUMS
