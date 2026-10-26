@@ -4,7 +4,6 @@ run-name: F1 arm64 - media session reactivation
 on:
   push:
     branches: [master]
-    paths: [.github/workflows/build-apk.yml]
   workflow_dispatch:
 
 permissions:
