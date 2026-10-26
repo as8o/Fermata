@@ -8,6 +8,8 @@ After Spotify has played, opening Fermata Auto's projection interface and resumi
 
 Local playback passes through `MediaSessionCallback.play()` or `playPreparedItem()`, which requests audio focus through the native engine. YouTube's HTML video starts or resumes inside WebView; `YoutubeMediaEngine.playing()` reports that event through `setEngine()` and `onEngineStarted()`. YouTube deliberately overrides audio-focus requests to return success without requesting native focus; Chromium can manage focus for the embedded video itself.
 
+The engine attachment also differs: the local `playPreparedItem()` path assigns the created engine directly, whereas YouTube calls `setEngine()`, which invokes `onStop()` when changing engines. Local paused-to-playing resume does not invoke that stop path.
+
 Independently of focus, Fermata activates its media session in the callback constructor, but `stopped()` deactivates it. `setEngine()` invokes the stop path when switching engines. The original `setPlaybackState()` publishes subsequent `STATE_PLAYING` updates without reactivating the session. A session can therefore advertise playing state while remaining inactive.
 
 The pre-1.9.9 Control APK exposed a separate proxy session. Its connection activated that proxy, and playback-state replication did not replicate the underlying session's active flag. That could mask the inactive playback session.
