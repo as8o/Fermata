@@ -82,3 +82,9 @@ On the Samsung S25 running Android 17, Android registered both F1 projection ser
 The F1 test branch now declares uniquely named subclasses, `me.aap.fermata.auto.f1.F1CarService` and `me.aap.fermata.auto.f1.F1MirrorService`, as its projection entry services. They inherit the existing implementations without changing playback or mirroring behaviour. This tests whether sharing the original service class names caused the host to collapse the entries. The application ID and signing configuration are unchanged, allowing an update over the previous F1 installation. This test packaging change is separate from the clean media-session fix branch.
 
 Install the updated APK through KingInstaller with the original Fermata enabled. Force-stop Android Auto, reopen Customize launcher and reconnect. Check that both apps' projection entries coexist, launch F1 and F1 Mirror, then repeat the Spotify/YouTube steering-control test above. If the entries still disappear, the class-name hypothesis is not sufficient; collect broader host discovery logs before changing more identifiers.
+
+## Branch separation and latest feedback
+
+See [F1-branches.md](F1-branches.md) for the change inventory, update direction and PR checklist, and [PR-session-reactivation.md](PR-session-reactivation.md) for a ready-to-copy upstream PR description.
+
+The reporter now confirms that F1 projection and Mirror appear alongside the enabled original Fermata. Initial steering-control testing appears successful; extended testing is pending. This confirms launcher coexistence in the reported setup, not complete Mirror functional testing or compatibility across other phones and head units.
