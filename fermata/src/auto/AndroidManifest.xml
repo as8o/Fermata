@@ -47,7 +47,7 @@
             tools:ignore="MetadataTagInsideApplicationTag" />
 
         <service
-            android:name="me.aap.fermata.auto.CarService"
+            android:name="me.aap.fermata.auto.f1.F1CarService"
             android:exported="true"
             android:label="@string/app_name"
             tools:ignore="ExportedService">
@@ -60,7 +60,7 @@
         </service>
 
         <service
-            android:name="me.aap.fermata.auto.MirrorService"
+            android:name="me.aap.fermata.auto.f1.F1MirrorService"
             android:exported="true"
             android:icon="@drawable/mirror"
             android:label="@string/mirror_service_name"

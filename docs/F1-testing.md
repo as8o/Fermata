@@ -74,3 +74,11 @@ If the session becomes active and controls work, that supports the lifecycle dia
 ## Validation status
 
 The build workflow checks the package identity, app label and APK signature. A successful build verifies compilation and packaging; the Android Auto routing behaviour requires the car test above.
+
+## Projection coexistence experiment
+
+On the Samsung S25 running Android 17, Android registered both F1 projection services and KingInstaller reported the expected installer identity. Android Auto showed only F1 Media Service while the official Fermata was enabled. Disabling the official package made F1, F1 Mirror and F1 Media Service appear; enabling it again hid the F1 projection entries. This reproducible result supports an Android Auto discovery interaction between the installations. It does not establish the exact internal deduplication key.
+
+The F1 test branch now declares uniquely named subclasses, `me.aap.fermata.auto.f1.F1CarService` and `me.aap.fermata.auto.f1.F1MirrorService`, as its projection entry services. They inherit the existing implementations without changing playback or mirroring behaviour. This tests whether sharing the original service class names caused the host to collapse the entries. The application ID and signing configuration are unchanged, allowing an update over the previous F1 installation. This test packaging change is separate from the clean media-session fix branch.
+
+Install the updated APK through KingInstaller with the original Fermata enabled. Force-stop Android Auto, reopen Customize launcher and reconnect. Check that both apps' projection entries coexist, launch F1 and F1 Mirror, then repeat the Spotify/YouTube steering-control test above. If the entries still disappear, the class-name hypothesis is not sufficient; collect broader host discovery logs before changing more identifiers.
