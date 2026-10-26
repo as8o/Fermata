@@ -1,137 +1,54 @@
-name: Build APK
+name: Build F1 test APK
 
 on:
   push:
-  pull_request:
+    branches: [feature/android-auto-f1]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
-env:
-  JAVA_VERSION: '17'
-  JAVA_DISTRIBUTION: 'temurin'
+concurrency:
+  group: f1-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build Fermata Auto APKs
+    name: F1 arm64 Android Auto APK
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
+    env:
+      NO_GS: 'true'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          submodules: recursive
-
-      - name: Read versions from version catalog
-        run: |
-          ver_file=gradle/libs.versions.toml
-          version() { grep -Po "(?<=$1).+" $ver_file |  sed -e 's/[= "]//g'; }
-          app_version="$(version appVersionName)-$(git rev-parse --short HEAD)"
-          sed -ri "s/appVersionName.+/appVersionName = \"$app_version\"/" $ver_file
-          echo "APP_VERSION=$app_version" >> $GITHUB_ENV
-          echo "ANDROID_NDK_VERSION=$(version ndkVersion)" >> $GITHUB_ENV
-
-      - name: Export vars
-        env:
-          APP_NAME: ${{ vars.APP_NAME }}
-          APP_ID_SFX: ${{ vars.APP_ID_SFX }}
-          ARTIFACT_SFX: ${{ vars.ARTIFACT_SFX }}
-        run: |
-          export_vars() {
-            for name in "$@"; do
-              local value="${!name}"
-              [ -z "$value" ] && continue
-              [ "$value" = "none" ] && value=""
-              echo "$name=$value" >> "$GITHUB_ENV"
-            done
-          }
-          export_vars APP_NAME APP_ID_SFX ARTIFACT_SFX
-
-      - name: Prepare build identifiers
-        env:
-          BRANCH_OWNER: ${{ github.event.pull_request.head.repo.owner.login || github.repository_owner }}
-          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
-        run: |
-          [ -v APP_NAME ] && [ -v APP_ID_SFX ] && [ -v ARTIFACT_SFX ] && exit 0
-
-          sanitize_package_segment() {
-            tr '[:upper:]' '[:lower:]' <<< "$1" \
-              | sed -E 's/[^a-z0-9]+/_/g; s/^_+|_+$//g; s/_+/_/g; s/^([0-9])/x\1/'
-          }
-
-          owner="$(sanitize_package_segment "$BRANCH_OWNER")"
-          branch="$(sanitize_package_segment "$BRANCH_NAME")"
-          sha="$(git rev-parse --short HEAD)"
-
-          [ -v APP_NAME ] || echo "APP_NAME=Fermata Auto (${BRANCH_OWNER}-${sha})" >> "$GITHUB_ENV"
-          [ -v APP_ID_SFX ] || echo "APP_ID_SFX=.${owner}" >> "$GITHUB_ENV"
-          [ -v ARTIFACT_SFX ] || echo "ARTIFACT_SFX=-${owner}-${branch}" >> "$GITHUB_ENV"
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
         with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: ${{ env.JAVA_DISTRIBUTION }}
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools'
-
-      - name: Cache Android NDK
-        uses: actions/cache@v4
-        with:
-          path: /usr/local/lib/android/sdk/ndk/${{ env.ANDROID_NDK_VERSION }}
-          key: ${{ runner.os }}-android-ndk-${{ env.ANDROID_NDK_VERSION }}
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Create keystore and local.properties
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build F1 universal APK with all feature modules
         run: |
-          [ -z "${{ secrets.CI_KEYSTORE }}" ] && exit 0
-          echo "${{ secrets.CI_KEYSTORE }}" | base64 -d > keystore.jks
-
-          cat > local.properties <<EOF
-          storeFile=$(pwd)/keystore.jks
-          keyAlias=${{ secrets.CI_ALIAS }}
-          keyPassword=${{ secrets.CI_KEY_PWD }}
-          storePassword=${{ secrets.CI_KEYSTORE_PWD }}
-          EOF
-
-      - name: Build APKs
-        env:
-          NO_GS: true
+          chmod +x gradlew
+          ./gradlew :fermata:packageAutoReleaseUniversalApk --build-cache \
+            -PABI=arm64-v8a -PAPP_ID_SFX=.f1 -PAPP_NAME=F1
+      - name: Verify package identity and signature
         run: |
-          out=fermata/build/outputs/apk_from_bundle/autoRelease
-          mkdir -p dist/arm64 dist/arm
-          echo "App name: $APP_NAME"
-          echo "Package suffix: $APP_ID_SFX"
-          ARGS=(--build-cache)
-           [ -z "$APP_NAME" ] || ARGS+=("-PAPP_NAME=$APP_NAME")
-           [ -z "$APP_ID_SFX" ] || ARGS+=("-PAPP_ID_SFX=$APP_ID_SFX")
-           ./gradlew fermata:packageAutoReleaseUniversalApk -PABI=arm64-v8a "${ARGS[@]}"
-          mv $out/*.apk dist/arm64/
-          ./gradlew fermata:packageAutoReleaseUniversalApk -PABI=armeabi-v7a "${ARGS[@]}"
-          mv $out/*.apk dist/arm/
-
-      - name: Upload arm64 APK
-        uses: actions/upload-artifact@v4
+          mkdir -p dist
+          cp fermata/build/outputs/apk_from_bundle/autoRelease/*.apk dist/F1-arm64.apk
+          tools_dir="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$tools_dir/aapt" dump badging dist/F1-arm64.apk > dist/apk-badging.txt
+          grep -F "name='me.aap.fermata.auto.f1'" dist/apk-badging.txt
+          grep -F "application-label:'F1'" dist/apk-badging.txt
+          "$tools_dir/apksigner" verify --verbose --print-certs dist/F1-arm64.apk > dist/apk-signature.txt
+          git rev-parse HEAD > dist/source-commit.txt
+          sha256sum dist/F1-arm64.apk > dist/SHA256SUMS
+          cp docs/F1-testing.md dist/
+      - uses: actions/upload-artifact@v4
         with:
-          name: fermata-auto-${{ env.APP_VERSION }}${{ env.ARTIFACT_SFX }}-arm64
-          path: dist/arm64/*.apk
-          retention-days: 30
+          name: F1-arm64-test-apk
+          path: dist/
           if-no-files-found: error
-
-      - name: Upload arm APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: fermata-auto-${{ env.APP_VERSION }}${{ env.ARTIFACT_SFX }}-arm
-          path: dist/arm/*.apk
           retention-days: 30
-          if-no-files-found: error
